@@ -15,6 +15,7 @@
  */
 package com.zhihu.matisse.internal.utils;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -25,6 +26,7 @@ import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.v4.app.Fragment;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.content.FileProvider;
 import android.support.v4.os.EnvironmentCompat;
 
@@ -105,6 +107,17 @@ public class MediaStoreCompat {
         }
     }
 
+    public Context getContext() {
+        if (mFragment != null) {
+            Fragment fragment = mFragment.get();
+            if (fragment != null) {
+                return fragment.getContext();
+            }
+            return null;
+        }
+        return mContext.get();
+    }
+
     @SuppressWarnings("ResultOfMethodCallIgnored")
     private File createImageFile() throws IOException {
         // Create an image file name
@@ -112,16 +125,29 @@ public class MediaStoreCompat {
                 new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         String imageFileName = String.format("JPEG_%s.jpg", timeStamp);
         File storageDir;
-        if (mCaptureStrategy.isPublic) {
-            storageDir = Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_PICTURES);
-            if (!storageDir.exists()) storageDir.mkdirs();
+
+
+        Context context = getContext();
+
+        if (null != context && null != mCaptureStrategy.directory &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        == PackageManager.PERMISSION_DENIED) {
+            // permission denied
+            storageDir = new File(mCaptureStrategy.directory);
+            if (!storageDir.exists())
+                storageDir.mkdirs();
         } else {
-            storageDir = mContext.get().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        }
-        if (mCaptureStrategy.directory != null) {
-            storageDir = new File(storageDir, mCaptureStrategy.directory);
-            if (!storageDir.exists()) storageDir.mkdirs();
+            if (mCaptureStrategy.isPublic) {
+                storageDir = Environment.getExternalStoragePublicDirectory(
+                        Environment.DIRECTORY_PICTURES);
+                if (!storageDir.exists()) storageDir.mkdirs();
+            } else {
+                storageDir = mContext.get().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+            }
+            if (mCaptureStrategy.directory != null) {
+                storageDir = new File(storageDir, mCaptureStrategy.directory);
+                if (!storageDir.exists()) storageDir.mkdirs();
+            }
         }
 
         // Avoid joining path components manually
